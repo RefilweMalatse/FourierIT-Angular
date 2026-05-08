@@ -1,0 +1,135 @@
+<div class="page">
+  <div class="page-header">
+    <div class="page-header__titles">
+      <h1>Department Management</h1>
+      <p>Manage organizational departments</p>
+    </div>
+    <button class="btn btn--primary" (click)="openCreate()">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+      Register Department
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div style="margin-bottom:18px">
+    <div class="search-box" style="width:320px">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 15.803 7.5 7.5 0 0016.803 15.803z"/></svg>
+      <input placeholder="Search departments..." (input)="search.set($any($event.target).value)">
+    </div>
+  </div>
+
+  <!-- Department Grid -->
+  <div class="dept-grid">
+    @for (dept of filtered; track dept.id) {
+      <div class="dept-card">
+        <div class="dept-card__header">
+          <div class="dept-card__icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21"/></svg>
+          </div>
+          <div class="dept-card__titles">
+            <h3>{{ dept.name }}</h3>
+            <span class="dept-card__code">{{ dept.code }}</span>
+          </div>
+          <div class="dept-card__menu">
+            <button class="icon-btn" (click)="openEdit(dept)" title="Edit">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z"/></svg>
+            </button>
+            <button class="icon-btn icon-btn--danger" (click)="onDelete(dept.id)" title="Delete">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="dept-card__meta">
+          <div class="dept-card__meta-item">
+            <span class="label">Manager</span>
+            <span class="val">{{ dept.managerName }}</span>
+          </div>
+          <div class="dept-card__meta-item">
+            <span class="label">Branch</span>
+            <span class="val">{{ dept.branch }}</span>
+          </div>
+        </div>
+        <div class="dept-card__stats">
+          <span>👤 {{ dept.userCount }} users</span>
+          <span>📄 {{ dept.docCount }} docs</span>
+        </div>
+        <div class="dept-card__footer">
+          <span class="badge badge--{{ dept.status }}">{{ dept.status | titlecase }}</span>
+          <span class="dept-card__date">{{ dept.createdAt }}</span>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- MODAL -->
+@if (showModal()) {
+  <div class="modal-overlay" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="modal__header">
+        <div>
+          <h2>{{ editId() ? 'Edit Department' : 'Register New Department' }}</h2>
+          <p>{{ editId() ? 'Update department details' : 'Create a new department in the system' }}</p>
+        </div>
+        <button class="icon-btn" (click)="closeModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <form class="modal__body" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+        <div class="form-row">
+          <div class="field">
+            <label>Department Name <span class="req">*</span></label>
+            <input type="text" formControlName="departmentName" placeholder="e.g. Finance">
+            @if (form.get('departmentName')?.invalid && form.get('departmentName')?.touched) {
+              <span class="field__error">Department name is required.</span>
+            }
+          </div>
+          <div class="field">
+            <label>Department Code <span class="req">*</span></label>
+            <input type="text" formControlName="departmentCode" placeholder="e.g. FIN" style="text-transform:uppercase">
+            @if (form.get('departmentCode')?.invalid && form.get('departmentCode')?.touched) {
+              <span class="field__error">Code required (max 5 chars).</span>
+            }
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Branch <span class="req">*</span></label>
+            <select formControlName="branchId">
+              <option value="">Select branch</option>
+              @for (b of branches; track b.id) {
+                <option [value]="b.id">{{ b.name }}</option>
+              }
+            </select>
+          </div>
+          <div class="field">
+            <label>Manager Name <span class="req">*</span></label>
+            <input type="text" formControlName="managerName" placeholder="e.g. John Smith">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Email</label>
+            <input type="email" formControlName="email" placeholder="dept@fourier.com">
+          </div>
+          <div class="field">
+            <label>Phone</label>
+            <input type="tel" formControlName="phone" placeholder="+27 11 000 0000">
+          </div>
+        </div>
+        <div class="form-row form-row--full">
+          <div class="field">
+            <label>Description</label>
+            <textarea formControlName="description" placeholder="Brief description of the department"></textarea>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button type="button" class="btn btn--outline" (click)="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn--primary" [disabled]="isSubmitting()">
+            {{ isSubmitting() ? 'Saving...' : (editId() ? 'Update Department' : 'Register Department') }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
