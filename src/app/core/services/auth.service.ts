@@ -8,7 +8,7 @@ import { User } from '../models/user.model';
 const TOKEN_KEY = 'docuvault_token';
 
 export interface LoginPayload { username: string; password: string; }
-export interface AuthResponse  { userName: string; email: string; token: string;}
+export interface AuthResponse { userName: string; email: string; token: string; }
 export interface RegisterPayload {
   firstName: string;
   lastName: string;
@@ -23,11 +23,11 @@ export interface RegisterPayload {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private http   = inject(HttpClient);
+  private http = inject(HttpClient);
   private router = inject(Router);
-  private base   = `${environment.apiUrl}/user`;
+  private base = `${environment.apiUrl}/user`;
 
-  currentUser     = signal<User | null>(null);
+  currentUser = signal<User | null>(null);
   isAuthenticated = computed(() => !!this.currentUser());
 
   login(payload: LoginPayload): Observable<AuthResponse> {
@@ -48,6 +48,7 @@ export class AuthService {
   register(payload: RegisterPayload): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.base}/register`, payload);
   }
+
 
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
