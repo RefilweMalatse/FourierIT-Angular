@@ -2,7 +2,9 @@ import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/cor
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService, RegisterPayload } from '../../../core/services/auth.service';
 
 @Component({
   selector: 'app-register-user',
@@ -15,6 +17,7 @@ import { ToastService } from '../../../core/services/toast.service';
 export class RegisterUserComponent {
   private fb    = inject(FormBuilder);
   private toast = inject(ToastService);
+  private auth = inject(AuthService);
   private router = inject(Router);
 
   isSubmitting = signal(false);
@@ -68,13 +71,44 @@ export class RegisterUserComponent {
     if (this.form.value.password !== this.form.value.confirmPassword) {
       this.toast.show('Passwords do not match.', 'error'); return;
     }
+
+    const raw = this.form.getRawValue();
+    const selectedRoleName = this.roles.find(r => r.id === raw.roleId)?.name;
+
+    if (!selectedRoleName) {
+      this.toast.show('Please select a valid role.', 'error');
+      return;
+    }
+
+    const emailAddress = (raw.email ?? '').trim();
+    const username = emailAddress.split('@')[0]?.trim() || emailAddress;
+
+    const payload: RegisterPayload = {
+      firstName: (raw.firstName ?? '').trim(),
+      lastName: (raw.lastName ?? '').trim(),
+      // Temporary defaults because the current UI does not capture these yet.
+      dateOfBirth: '2000-01-01',
+      phoneNumber: (raw.phone ?? '').trim(),
+      jobTitle: 'General User',
+      username,
+      emailAddress,
+      password: raw.password ?? '',
+      role: selectedRoleName
+    };
+
     this.isSubmitting.set(true);
-    // TODO: connect to AuthService / UserService API call
-    setTimeout(() => {
-      this.isSubmitting.set(false);
-      this.toast.show('User registered successfully.', 'success');
-      this.router.navigate(['/users/management']);
-    }, 800);
+    this.auth.register(payload)
+      .pipe(finalize(() => this.isSubmitting.set(false)))
+      .subscribe({
+        next: () => {
+          this.toast.show('User registered successfully.', 'success');
+          this.router.navigate(['/users/management']);
+        },
+        error: (error) => {
+          const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Registration failed. Please try again.';
+          this.toast.show(message, 'error');
+        }
+      });
   }
 
   cancel(): void { this.router.navigate(['/users/management']); }
