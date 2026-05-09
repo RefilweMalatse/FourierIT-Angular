@@ -1,10 +1,11 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
 import { AuthService, RegisterPayload } from '../../../core/services/auth.service';
+import { RoleService } from '../../../core/services/role.service';
 
 @Component({
   selector: 'app-register-user',
@@ -14,25 +15,30 @@ import { AuthService, RegisterPayload } from '../../../core/services/auth.servic
   templateUrl: './register-user.component.html',
   styleUrl: './register-user.component.scss'
 })
-export class RegisterUserComponent {
-  private fb    = inject(FormBuilder);
+export class RegisterUserComponent implements OnInit {
+  private fb = inject(FormBuilder);
   private toast = inject(ToastService);
   private auth = inject(AuthService);
+  private roleService = inject(RoleService);
   private router = inject(Router);
 
   isSubmitting = signal(false);
+  isLoadingRoles = signal(false);
 
   // From ERD: User(Email, Password_hash, mfa_enabled, IsPEPstatus, AccountStatus)
   // Profile(Address), SecurityQuestion
   form = this.fb.group({
     // User fields
-    email:           ['', [Validators.required, Validators.email]],
+    email: ['', [Validators.required, Validators.email]],
+    username: ['', Validators.required],
     password:        ['', [Validators.required, Validators.minLength(8)]],
     confirmPassword: ['', Validators.required],
     // Profile fields
     firstName:       ['', Validators.required],
     lastName:        ['', Validators.required],
-    phone:           [''],
+    dateOfBirth: ['', Validators.required],
+    phone: [''],
+    jobTitle: ['', Validators.required],
     // Address (from ERD: Address table)
     addressLine:     [''],
     postalCode:      [''],
@@ -50,12 +56,7 @@ export class RegisterUserComponent {
     accountStatus:   ['Active'],
   });
 
-  roles = [
-    { id: '1', name: 'Admin' },
-    { id: '2', name: 'Editor' },
-    { id: '3', name: 'Viewer' },
-    { id: '4', name: 'Department Manager' },
-  ];
+  roles: Array<{ id: string; name: string }> = [];
 
   securityQuestions = [
     'What was the name of your first pet?',
@@ -66,6 +67,28 @@ export class RegisterUserComponent {
 
   provinces = ['Gauteng','Western Cape','KwaZulu-Natal','Eastern Cape','Limpopo','Mpumalanga','North West','Free State','Northern Cape'];
 
+  ngOnInit(): void {
+    this.loadRoles();
+  }
+
+  private loadRoles(): void {
+    this.isLoadingRoles.set(true);
+    this.roleService.getRoles()
+      .pipe(finalize(() => this.isLoadingRoles.set(false)))
+      .subscribe({
+        next: (roles) => {
+          this.roles = (roles ?? []).map(role => ({
+            id: role.roleId,
+            name: role.roleName
+          }));
+        },
+        error: () => {
+          this.roles = [];
+          this.toast.show('Could not load roles from API. Ensure you are logged in as Department Admin.', 'error');
+        }
+      });
+  }
+
   onSubmit(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     if (this.form.value.password !== this.form.value.confirmPassword) {
@@ -74,24 +97,19 @@ export class RegisterUserComponent {
 
     const raw = this.form.getRawValue();
     const selectedRoleName = this.roles.find(r => r.id === raw.roleId)?.name;
-
     if (!selectedRoleName) {
       this.toast.show('Please select a valid role.', 'error');
       return;
     }
 
-    const emailAddress = (raw.email ?? '').trim();
-    const username = emailAddress.split('@')[0]?.trim() || emailAddress;
-
     const payload: RegisterPayload = {
       firstName: (raw.firstName ?? '').trim(),
       lastName: (raw.lastName ?? '').trim(),
-      // Temporary defaults because the current UI does not capture these yet.
-      dateOfBirth: '2000-01-01',
+      dateOfBirth: raw.dateOfBirth ?? '',
       phoneNumber: (raw.phone ?? '').trim(),
-      jobTitle: 'General User',
-      username,
-      emailAddress,
+      jobTitle: (raw.jobTitle ?? '').trim(),
+      username: (raw.username ?? '').trim().toLowerCase(),
+      emailAddress: (raw.email ?? '').trim(),
       password: raw.password ?? '',
       role: selectedRoleName
     };

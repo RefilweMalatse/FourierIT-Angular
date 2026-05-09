@@ -20,9 +20,21 @@
         }
       </div>
       <div class="field">
+        <label>Username <span class="req">*</span></label>
+        <input type="text" formControlName="username" placeholder="e.g. jsmith">
+        @if (form.get('username')?.invalid && form.get('username')?.touched) {
+          <span class="field__error">Username is required.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
         <label>Role <span class="req">*</span></label>
-        <select formControlName="roleId">
-          <option value="">Select role</option>
+        <select formControlName="roleId" [disabled]="isLoadingRoles() || roles.length === 0">
+          <option value="">
+            {{ isLoadingRoles() ? 'Loading roles...' : 'Select role' }}
+          </option>
           @for (r of roles; track r.id) {
             <option [value]="r.id">{{ r.name }}</option>
           }
@@ -63,6 +75,23 @@
         <input type="text" formControlName="lastName" placeholder="e.g. Smith">
         @if (form.get('lastName')?.invalid && form.get('lastName')?.touched) {
           <span class="field__error">Last name is required.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Date of Birth <span class="req">*</span></label>
+        <input type="date" formControlName="dateOfBirth">
+        @if (form.get('dateOfBirth')?.invalid && form.get('dateOfBirth')?.touched) {
+          <span class="field__error">Date of birth is required.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Job Title <span class="req">*</span></label>
+        <input type="text" formControlName="jobTitle" placeholder="e.g. Compliance Officer">
+        @if (form.get('jobTitle')?.invalid && form.get('jobTitle')?.touched) {
+          <span class="field__error">Job title is required.</span>
         }
       </div>
     </div>
