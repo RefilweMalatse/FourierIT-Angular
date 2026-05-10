@@ -1,15 +1,23 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { ApiDepartmentDto, DepartmentService, SaveDepartmentPayload } from '../../../core/services/department.service';
 
 // ERD: Department(DepartmentID, BranchID, DepartmentName)
 // Branch(BranchID, InstitutionID, BranchName, City)
 export interface Department {
-  id: string; name: string; code: string;
-  managerName: string; branch: string;
-  userCount: number; docCount: number;
-  status: 'active' | 'inactive'; createdAt: string;
+  id: number;
+  name: string;
+  branchId: number;
+  registeredBy: string;
+  branch: string;
+  userCount: number;
+  docCount: number;
+  status: 'active' | 'inactive';
+  createdAt: string;
 }
 
 @Component({
@@ -23,51 +31,50 @@ export interface Department {
 export class DepartmentsComponent {
   private fb    = inject(FormBuilder);
   private toast = inject(ToastService);
+  private departmentService = inject(DepartmentService);
+  readonly auth = inject(AuthService);
 
   showModal    = signal(false);
-  editId       = signal<string | null>(null);
+  editId       = signal<number | null>(null);
   isSubmitting = signal(false);
+  isLoading = signal(false);
+  isLoadingBranches = signal(false);
   search       = signal('');
 
   // ERD: Department(DepartmentName) + Branch(BranchName, City) + Institution link
   form = this.fb.group({
     departmentName: ['', Validators.required],
-    departmentCode: ['', [Validators.required, Validators.maxLength(5)]],
     branchId:       ['', Validators.required],
-    managerName:    ['', Validators.required],
-    location:       [''],
-    description:    [''],
-    email:          ['', Validators.email],
-    phone:          [''],
   });
 
-  branches = [
-    { id: '1', name: 'Head Office — Johannesburg' },
-    { id: '2', name: 'London Branch' },
-    { id: '3', name: 'Singapore Branch' },
-  ];
+  /** Branch options from API (ids match database). */
+  branchOptions = signal<Array<{ id: string; name: string }>>([]);
 
-  departments = signal<Department[]>([
-    { id:'1', name:'Finance',         code:'FIN', managerName:'John Smith',    branch:'Head Office', userCount:12, docCount:847, status:'active',   createdAt:'2024-01-15' },
-    { id:'2', name:'Human Resources', code:'HR',  managerName:'Sarah Johnson', branch:'Head Office', userCount:8,  docCount:623, status:'active',   createdAt:'2024-01-20' },
-    { id:'3', name:'Legal',           code:'LEG', managerName:'Michael Chen',  branch:'London Branch',userCount:6, docCount:445, status:'active',   createdAt:'2024-02-01' },
-    { id:'4', name:'Operations',      code:'OPS', managerName:'Emma Davis',    branch:'Head Office', userCount:15, docCount:931, status:'active',   createdAt:'2024-02-10' },
-    { id:'5', name:'Marketing',       code:'MKT', managerName:'James Wilson',  branch:'Head Office', userCount:10, docCount:531, status:'active',   createdAt:'2024-02-15' },
-    { id:'6', name:'IT',              code:'IT',  managerName:'Lisa Anderson', branch:'Singapore Branch',userCount:9,docCount:412,status:'inactive', createdAt:'2024-03-01' },
-  ]);
+  departments = signal<Department[]>([]);
+
+  constructor() {
+    this.loadBranchesThenDepartments();
+  }
 
   get filtered() {
     const q = this.search().toLowerCase();
     return this.departments().filter(d =>
-      d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q)
+      d.name.toLowerCase().includes(q)
     );
   }
 
-  openCreate(): void { this.form.reset(); this.editId.set(null); this.showModal.set(true); }
+  openCreate(): void {
+    this.form.reset({ departmentName: '', branchId: '' });
+    this.editId.set(null);
+    this.showModal.set(true);
+  }
 
   openEdit(dept: Department): void {
     this.editId.set(dept.id);
-    this.form.patchValue({ departmentName: dept.name, departmentCode: dept.code, managerName: dept.managerName });
+    this.form.patchValue({
+      departmentName: dept.name,
+      branchId: String(dept.branchId)
+    });
     this.showModal.set(true);
   }
 
@@ -75,17 +82,111 @@ export class DepartmentsComponent {
 
   onSubmit(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    const value = this.form.getRawValue();
+    const branchId = Number(value.branchId);
+    if (!branchId || Number.isNaN(branchId)) {
+      this.toast.show('Please select a valid branch.', 'error');
+      return;
+    }
+
+    const payload: SaveDepartmentPayload = {
+      departmentName: (value.departmentName ?? '').trim(),
+      branchId
+    };
+
     this.isSubmitting.set(true);
-    // TODO: connect to DepartmentService API
-    setTimeout(() => {
-      this.isSubmitting.set(false);
-      this.toast.show(this.editId() ? 'Department updated.' : 'Department registered.', 'success');
-      this.showModal.set(false);
-    }, 800);
+    const request$ = this.editId()
+      ? this.departmentService.update(this.editId()!, payload)
+      : this.departmentService.create(payload);
+
+    request$
+      .pipe(finalize(() => this.isSubmitting.set(false)))
+      .subscribe({
+        next: () => {
+          this.toast.show(this.editId() ? 'Department updated.' : 'Department registered.', 'success');
+          this.showModal.set(false);
+          this.loadDepartments();
+        },
+        error: (error) => {
+          const body = error?.error;
+          const message =
+            (typeof body === 'string' ? body : null)
+            ?? body?.error
+            ?? body?.title
+            ?? body?.message
+            ?? 'Failed to save department.';
+          this.toast.show(typeof message === 'string' ? message : 'Failed to save department.', 'error');
+        }
+      });
   }
 
-  onDelete(id: string): void {
-    this.departments.update(list => list.filter(d => d.id !== id));
-    this.toast.show('Department deleted.', 'success');
+  onDelete(id: number): void {
+    this.departmentService.delete(id).subscribe({
+      next: () => {
+        this.departments.update(list => list.filter(d => d.id !== id));
+        this.toast.show('Department deleted.', 'success');
+      },
+      error: (error) => {
+        const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to delete department.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  private loadBranchesThenDepartments(): void {
+    this.isLoadingBranches.set(true);
+    this.departmentService.getBranches()
+      .pipe(finalize(() => this.isLoadingBranches.set(false)))
+      .subscribe({
+        next: (rows) => {
+          const opts = (rows ?? []).map(b => ({
+            id: String(b.branchId),
+            name: b.city ? `${b.branchName} — ${b.city}` : b.branchName
+          }));
+          this.branchOptions.set(opts);
+          if (!opts.length) {
+            this.toast.show('No branches in the database. Restart the API to seed default branches, or add branches first.', 'error');
+          }
+          this.loadDepartments();
+        },
+        error: (error) => {
+          this.branchOptions.set([]);
+          const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to load branches.';
+          this.toast.show(message, 'error');
+          this.loadDepartments();
+        }
+      });
+  }
+
+  private loadDepartments(): void {
+    this.isLoading.set(true);
+    this.departmentService.getAll()
+      .pipe(finalize(() => this.isLoading.set(false)))
+      .subscribe({
+        next: (items) => {
+          this.departments.set((items ?? []).map(d => this.mapDepartment(d)));
+        },
+        error: (error) => {
+          this.departments.set([]);
+          const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to load departments.';
+          this.toast.show(message, 'error');
+        }
+      });
+  }
+
+  private mapDepartment(dto: ApiDepartmentDto): Department {
+    const user = this.auth.currentUser();
+    const branchLabel = this.branchOptions().find(b => Number(b.id) === dto.branchId)?.name ?? `Branch ${dto.branchId}`;
+    return {
+      id: dto.departmentId,
+      name: dto.departmentName ?? '',
+      branchId: dto.branchId,
+      registeredBy: `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() || (user?.email ?? 'Current User'),
+      branch: branchLabel,
+      userCount: 0,
+      docCount: 0,
+      status: 'active',
+      createdAt: dto.createdAt ? String(dto.createdAt).slice(0, 10) : ''
+    };
   }
 }

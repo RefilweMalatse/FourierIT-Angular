@@ -10,7 +10,7 @@
   </div>
 
   <nav class="sidebar__nav">
-    @for (item of navItems; track item.label) {
+    @for (item of visibleNavItems; track item.label) {
 
       @if (!item.children) {
         <a class="sidebar__link"
@@ -49,11 +49,63 @@
     }
   </nav>
 
-  <div class="sidebar__user">
-    <div class="sidebar__avatar">{{ userInitials }}</div>
-    <div class="sidebar__user-info">
-      <strong>{{ userName }}</strong>
-      <span>{{ auth.currentUser()?.email ?? 'admin@fourier.com' }}</span>
-    </div>
-  </div>
+  <footer class="sidebar__footer">
+    <button type="button"
+            class="sidebar__user sidebar__user--trigger"
+            [class.sidebar__user--open]="profileOpen()"
+            (click)="toggleProfile($event)"
+            [attr.aria-expanded]="profileOpen()"
+            aria-label="View profile details">
+      <div class="sidebar__avatar" aria-hidden="true">{{ userInitials }}</div>
+      <div class="sidebar__user-info">
+        <strong class="sidebar__user-name" [title]="userName">{{ userName }}</strong>
+        @if (userEmail) {
+          <span class="sidebar__user-email" [title]="userEmail">{{ userEmail }}</span>
+        }
+      </div>
+      <svg class="sidebar__profile-chevron" xmlns="http://www.w3.org/2000/svg" fill="none"
+           viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+      </svg>
+    </button>
+
+    @if (profileOpen()) {
+      <div class="sidebar__profile-panel" role="region" aria-label="Your profile" (click)="$event.stopPropagation()">
+        @if (loadingAccount()) {
+          <p class="sidebar__profile-msg">Loading your details…</p>
+        } @else if (accountError()) {
+          <p class="sidebar__profile-msg sidebar__profile-msg--error">{{ accountError() }}</p>
+        } @else if (accountDetails(); as a) {
+          <dl class="sidebar__profile-dl">
+            <dt>Username</dt>
+            <dd>{{ a.userName }}</dd>
+            <dt>Email</dt>
+            <dd>{{ a.email }}</dd>
+            @if (profileFullName(a)) {
+              <dt>Name</dt>
+              <dd>{{ profileFullName(a) }}</dd>
+            }
+            <dt>Roles</dt>
+            <dd>{{ a.roles.length ? a.roles.join(', ') : '—' }}</dd>
+            <dt>Account status</dt>
+            <dd>{{ a.accountStatus }}</dd>
+            @if (displayPhone(a)) {
+              <dt>Phone</dt>
+              <dd>{{ displayPhone(a) }}</dd>
+            }
+            @if (a.jobTitle) {
+              <dt>Job title</dt>
+              <dd>{{ a.jobTitle }}</dd>
+            }
+            @if (a.dateOfBirth) {
+              <dt>Date of birth</dt>
+              <dd>{{ a.dateOfBirth }}</dd>
+            }
+          </dl>
+        }
+      </div>
+    }
+
+    <button type="button" class="sidebar__logout" (click)="logout()">Log out</button>
+  </footer>
 </aside>

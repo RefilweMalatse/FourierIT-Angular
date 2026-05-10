@@ -1,1 +1,93 @@
-.modal__footer { display: flex; justify-content: flex-end; gap: 12px; }
+.page {
+  display: grid;
+  gap: 1rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.table-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.table-toolbar {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 320px;
+}
+
+.search-box input {
+  width: 100%;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.td-name { font-weight: 600; }
+.action-buttons { display: flex; gap: 0.4rem; }
+.empty-state { padding: 1rem; color: var(--text-light); }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,31,48,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 220;
+}
+
+.modal {
+  width: min(700px, 94vw);
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.2);
+}
+
+.modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal__body {
+  padding: 1rem 1.25rem;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 0.5rem;
+}

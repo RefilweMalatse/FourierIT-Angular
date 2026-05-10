@@ -2,6 +2,7 @@ import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/cor
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
 
 export interface Stakeholder {
   id: string;
@@ -29,6 +30,7 @@ export interface Stakeholder {
   styleUrl: './all-stakeholders.component.scss'
 })
 export class AllStakeholdersComponent {
+  readonly auth = inject(AuthService);
   private fb = inject(FormBuilder);
   private toast = inject(ToastService);
 

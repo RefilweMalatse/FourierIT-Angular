@@ -33,3 +33,16 @@
   padding: 14px 24px; border-top: 1px solid var(--border);
   background: white; margin-top: 4px;
 }
+
+.table-card__pad {
+  padding: 20px 24px;
+}
+
+.td-name {
+  font-weight: 600;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.4rem;
+}
