@@ -37,6 +37,17 @@ export interface CurrentAccount {
   dateOfBirth: string | null;
 }
 
+export interface UpdateCurrentAccountPayload {
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  phoneNumber: string;
+  jobTitle: string;
+  emailAddress: string;
+  role: string;
+  accountStatus: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
@@ -115,6 +126,10 @@ export class AuthService {
 
   getCurrentAccount(): Observable<CurrentAccount> {
     return this.http.get<CurrentAccount>(`${this.base}/me`);
+  }
+
+  updateCurrentAccount(profileId: number, payload: UpdateCurrentAccountPayload): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${this.base}/profile/${profileId}`, payload);
   }
 
   private hydrateUserFromToken(): void {
