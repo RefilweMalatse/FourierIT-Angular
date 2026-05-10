@@ -1,16 +1,14 @@
-import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, signal, ChangeDetectionStrategy, ChangeDetectorRef, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
-
-export interface Institution {
-  id: string;
-  name: string;
-  verifiedDomain: string;
-  regNumber: string;
-  type: string;
-  status: 'active' | 'inactive';
-}
+import { AuthService } from '../../../core/services/auth.service';
+import {
+  InstitutionDto,
+  InstitutionService,
+  InstitutionTypeOption
+} from '../../../core/services/institution.service';
 
 @Component({
   selector: 'app-institutions',
@@ -20,76 +18,170 @@ export interface Institution {
   templateUrl: './institutions.component.html',
   styleUrl: './institutions.component.scss'
 })
-export class InstitutionsComponent {
-  private fb    = inject(FormBuilder);
+export class InstitutionsComponent implements OnInit {
+  readonly auth = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+  private fb = inject(FormBuilder);
   private toast = inject(ToastService);
+  private institutionService = inject(InstitutionService);
 
-  showModal    = signal(false);
-  editId       = signal<string | null>(null);
+  showModal = signal(false);
+  editId = signal<number | null>(null);
   isSubmitting = signal(false);
-  search       = signal('');
+  isLoadingList = signal(false);
+  isLoadingTypes = signal(false);
+  search = signal('');
 
-  // ERD: Institution(InstitutionName, VerifiedDomain, RegNumber, TypeID)
-  // Branch(BranchName, City)
+  institutionTypes = signal<InstitutionTypeOption[]>([]);
+  institutions = signal<InstitutionDto[]>([]);
+
   form = this.fb.group({
-    institutionName: ['', Validators.required],
-    verifiedDomain:  ['', Validators.required],
-    regNumber:       ['', Validators.required],
-    typeId:          ['', Validators.required],
-    phone:           ['', Validators.required],
-    email:           ['', [Validators.required, Validators.email]],
-    // Branch info
-    branchName:      [''],
-    city:            [''],
-    password:        ['', [Validators.required, Validators.minLength(8)]],
-    confirmPassword: ['', Validators.required],
+    institutionName: ['', [Validators.required, Validators.maxLength(150)]],
+    verifiedDomain: ['', [Validators.required, Validators.maxLength(255)]],
+    regNumber: [null as number | null, [Validators.required, Validators.min(1)]],
+    typeId: [null as number | null, Validators.required]
   });
 
-  institutionTypes = [
-    { id: '1', name: 'Bank' },
-    { id: '2', name: 'Insurance' },
-    { id: '3', name: 'Investment Firm' },
-    { id: '4', name: 'Government' },
-    { id: '5', name: 'NGO' },
-  ];
+  ngOnInit(): void {
+    this.loadTypes();
+    this.loadInstitutions();
+  }
 
-  // Mock data matching ERD Institution table
-  institutions = signal<Institution[]>([
-    { id: '1', name: 'Fourier Group Headquarters', verifiedDomain: 'fouriergroup.com', regNumber: 'FG-HQ-001', type: 'Investment Firm', status: 'active' },
-    { id: '2', name: 'Fourier Group Europe',       verifiedDomain: 'fouriergroup.eu',  regNumber: 'FG-EU-002', type: 'Investment Firm', status: 'active' },
-    { id: '3', name: 'Fourier Group Asia Pacific', verifiedDomain: 'fouriergroup.sg',  regNumber: 'FG-AP-003', type: 'Investment Firm', status: 'active' },
-  ]);
-
-  get filtered() {
-    const q = this.search().toLowerCase();
-    return this.institutions().filter(i =>
-      i.name.toLowerCase().includes(q) || i.verifiedDomain.toLowerCase().includes(q)
+  get filtered(): InstitutionDto[] {
+    const q = this.search().toLowerCase().trim();
+    if (!q) return this.institutions();
+    return this.institutions().filter(
+      i =>
+        i.institutionName.toLowerCase().includes(q) ||
+        i.verifiedDomain.toLowerCase().includes(q) ||
+        String(i.regNumber).includes(q) ||
+        (i.institutionTypeName ?? '').toLowerCase().includes(q)
     );
   }
 
-  openCreate(): void { this.form.reset(); this.editId.set(null); this.showModal.set(true); }
-
-  openEdit(inst: Institution): void {
-    this.editId.set(inst.id);
-    this.form.patchValue({ institutionName: inst.name, verifiedDomain: inst.verifiedDomain, regNumber: inst.regNumber });
+  openCreate(): void {
+    this.loadTypes();
+    this.editId.set(null);
+    this.form.reset({
+      institutionName: '',
+      verifiedDomain: '',
+      regNumber: null,
+      typeId: null
+    });
     this.showModal.set(true);
   }
 
-  closeModal(): void { this.showModal.set(false); }
-
-  onSubmit(): void {
-    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    this.isSubmitting.set(true);
-    // TODO: connect to InstitutionService API
-    setTimeout(() => {
-      this.isSubmitting.set(false);
-      this.toast.show(this.editId() ? 'Institution updated.' : 'Institution registered.', 'success');
-      this.showModal.set(false);
-    }, 800);
+  openEdit(inst: InstitutionDto): void {
+    this.loadTypes();
+    this.editId.set(inst.institutionId);
+    this.form.patchValue({
+      institutionName: inst.institutionName,
+      verifiedDomain: inst.verifiedDomain,
+      regNumber: inst.regNumber,
+      typeId: inst.typeId
+    });
+    this.showModal.set(true);
   }
 
-  onDelete(id: string): void {
-    this.institutions.update(list => list.filter(i => i.id !== id));
-    this.toast.show('Institution deleted.', 'success');
+  closeModal(): void {
+    this.showModal.set(false);
+  }
+
+  onSubmit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const v = this.form.getRawValue();
+    const typeId = v.typeId;
+    const regNumber = v.regNumber;
+    if (typeId == null || regNumber == null) return;
+
+    const payload = {
+      institutionName: (v.institutionName ?? '').trim(),
+      verifiedDomain: (v.verifiedDomain ?? '').trim(),
+      regNumber,
+      typeId
+    };
+
+    const id = this.editId();
+    this.isSubmitting.set(true);
+
+    const req$ =
+      id != null
+        ? this.institutionService.update(id, payload)
+        : this.institutionService.create(payload);
+
+    req$.pipe(finalize(() => this.isSubmitting.set(false))).subscribe({
+      next: () => {
+        this.toast.show(id != null ? 'Institution updated.' : 'Institution registered.', 'success');
+        this.showModal.set(false);
+        this.loadInstitutions();
+      },
+      error: err => {
+        const body = err?.error;
+        const message =
+          body?.error ??
+          body?.title ??
+          body?.detail ??
+          (typeof body === 'string' ? body : null) ??
+          'Request failed.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  onDelete(inst: InstitutionDto): void {
+    if (!confirm(`Delete institution "${inst.institutionName}"? This cannot be undone.`)) return;
+
+    this.institutionService.delete(inst.institutionId).subscribe({
+      next: () => {
+        this.institutions.update(list => list.filter(i => i.institutionId !== inst.institutionId));
+        this.toast.show('Institution deleted.', 'success');
+      },
+      error: err => {
+        const message =
+          err?.error?.error ?? err?.error?.title ?? err?.error?.message ?? 'Failed to delete institution.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  private loadInstitutions(): void {
+    this.isLoadingList.set(true);
+    this.institutionService
+      .getAll()
+      .pipe(finalize(() => this.isLoadingList.set(false)))
+      .subscribe({
+        next: rows => {
+          this.institutions.set(rows ?? []);
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.institutions.set([]);
+          const message =
+            err?.error?.title ?? err?.error?.message ?? 'Could not load institutions.';
+          this.toast.show(message, 'error');
+        }
+      });
+  }
+
+  private loadTypes(): void {
+    this.isLoadingTypes.set(true);
+    this.institutionService
+      .getTypes()
+      .pipe(finalize(() => this.isLoadingTypes.set(false)))
+      .subscribe({
+        next: types => {
+          this.institutionTypes.set(types ?? []);
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.institutionTypes.set([]);
+          this.toast.show('Could not load institution types.', 'error');
+        }
+      });
   }
 }

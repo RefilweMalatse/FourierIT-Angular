@@ -14,14 +14,14 @@
     }
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
-<!--email address-->
+<!-- username -->
       <div class="field">
-        <label for="email">User ID / Email</label>
-        <input id="email" type="text" formControlName="email"
-               placeholder="Enter your User ID or Email"
+        <label for="username">Username</label>
+        <input id="username" type="text" formControlName="username"
+               placeholder="Enter your username"
                autocomplete="username">
-        @if (form.get('email')?.invalid && form.get('email')?.touched) {
-          <span class="field__error">Please enter a valid email address.</span>
+        @if (form.get('username')?.invalid && form.get('username')?.touched) {
+          <span class="field__error">Username is required.</span>
         }
       </div>
 
@@ -66,7 +66,7 @@
     <button class="btn-pin">6-Digit Security PIN →</button>
 
     <div class="login-card__footer">
-      New to DocuVault? <a>Create an account →</a>
+      New to DocuVault? <a routerLink="/auth/register">Create an account →</a>
     </div>
   </div>
 

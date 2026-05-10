@@ -1,6 +1,6 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { finalize } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
@@ -9,7 +9,7 @@ import { AuthService } from '../../../core/services/auth.service';
   selector: 'app-login',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink],
   templateUrl: './login.component.html',
   styleUrl: './login.component.scss'
 })
@@ -25,7 +25,7 @@ export class LoginComponent {
   //create the login form  builder
   //uses the email and password
   form = this.fb.group({
-    email:    ['', [Validators.required, Validators.email]],
+    username:    ['', [Validators.required]],
     password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
@@ -38,7 +38,7 @@ export class LoginComponent {
     this.auth.login(this.form.value as any)
       .pipe(finalize(() => this.isLoading.set(false)))
       .subscribe({
-        next: () => this.router.navigate(['/dashboard']),
+        next: () => this.router.navigate([this.auth.getDefaultAppPath()]),
         error: (e) => this.errorMsg.set(e?.error?.message ?? 'Invalid credentials. Please try again.')
       });
   }

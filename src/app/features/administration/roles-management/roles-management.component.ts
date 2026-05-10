@@ -1,11 +1,13 @@
 import { Component, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
 import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { ApiRoleDto, RolesManagementService } from '../../../core/services/roles-management.service';
 
-// ERD: Role(RoleID, RoleName), Permission(PermissionID, PermissionKey), RolePermission(RoleID, PermissionID)
-export interface Permission { id: string; key: string; label: string; }
-export interface Role { id: string; name: string; description: string; permissions: string[]; userCount: number; }
+// ERD: Role(RoleID, RoleName)
+export interface Role { id: string; name: string; }
 
 @Component({
   selector: 'app-roles-management',
@@ -16,82 +18,98 @@ export interface Role { id: string; name: string; description: string; permissio
   styleUrl: './roles-management.component.scss'
 })
 export class RolesManagementComponent {
+  readonly auth = inject(AuthService);
   private fb    = inject(FormBuilder);
   private toast = inject(ToastService);
+  private rolesService = inject(RolesManagementService);
 
   showModal    = signal(false);
   editId       = signal<string | null>(null);
   isSubmitting = signal(false);
-
-  // ERD: Permission table (PermissionKey)
-  allPermissions: Permission[] = [
-    { id: '1', key: 'Create',             label: 'Create' },
-    { id: '2', key: 'Read',               label: 'Read' },
-    { id: '3', key: 'Update',             label: 'Update' },
-    { id: '4', key: 'Delete',             label: 'Delete' },
-    { id: '5', key: 'Share',              label: 'Share Documents' },
-    { id: '6', key: 'ManageUsers',        label: 'Manage Users' },
-    { id: '7', key: 'SystemSettings',     label: 'System Settings' },
-    { id: '8', key: 'Reports',            label: 'Reports' },
-    { id: '9', key: 'Download',           label: 'Download' },
-    { id: '10', key: 'ManageDeptUsers',   label: 'Manage Dept. Users' },
-  ];
+  isLoading = signal(false);
 
   form = this.fb.group({
+    roleId:      ['', [Validators.required, Validators.maxLength(450)]],
     roleName:    ['', [Validators.required, Validators.maxLength(50)]],
-    description: ['', Validators.required],
-    permissions: [[] as string[]],
   });
 
-  roles = signal<Role[]>([
-    { id: '1', name: 'Admin',              description: 'Full system access and control',          permissions: ['Create','Read','Update','Delete','ManageUsers','SystemSettings'], userCount: 3 },
-    { id: '2', name: 'Editor',             description: 'Can create and edit documents',           permissions: ['Create','Read','Update','Share'], userCount: 12 },
-    { id: '3', name: 'Viewer',             description: 'Read-only access to documents',           permissions: ['Read','Download'], userCount: 28 },
-    { id: '4', name: 'Department Manager', description: 'Manage department documents and users',   permissions: ['Create','Read','Update','Delete','ManageDeptUsers'], userCount: 5 },
-  ]);
+  roles = signal<Role[]>([]);
 
-  isChecked(key: string): boolean {
-    return (this.form.value.permissions ?? []).includes(key);
-  }
-
-  togglePermission(key: string): void {
-    const current = this.form.value.permissions ?? [];
-    const updated = current.includes(key)
-      ? current.filter(p => p !== key)
-      : [...current, key];
-    this.form.patchValue({ permissions: updated });
+  constructor() {
+    this.loadRoles();
   }
 
   openCreate(): void {
-    this.form.reset({ permissions: [] });
+    this.form.reset({ roleId: '', roleName: '' });
     this.editId.set(null);
     this.showModal.set(true);
   }
 
   openEdit(role: Role): void {
     this.editId.set(role.id);
-    this.form.patchValue({ roleName: role.name, description: role.description, permissions: role.permissions });
+    this.form.patchValue({ roleId: role.id, roleName: role.name });
+    this.form.controls.roleId.disable();
     this.showModal.set(true);
   }
 
-  closeModal(): void { this.showModal.set(false); }
+  closeModal(): void {
+    this.showModal.set(false);
+    this.form.controls.roleId.enable();
+  }
 
   onSubmit(): void {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    if ((this.form.value.permissions ?? []).length === 0) {
-      this.toast.show('Select at least one permission.', 'error'); return;
-    }
+
+    const raw = this.form.getRawValue();
+    const roleId = (raw.roleId ?? '').trim();
+    const roleName = (raw.roleName ?? '').trim();
+
     this.isSubmitting.set(true);
-    // TODO: connect to RoleService API
-    setTimeout(() => {
-      this.isSubmitting.set(false);
-      this.toast.show(this.editId() ? 'Role updated.' : 'Role created.', 'success');
-      this.showModal.set(false);
-    }, 600);
+    const request$ = this.editId()
+      ? this.rolesService.update(this.editId()!, { roleName, newRoleId: this.editId()! })
+      : this.rolesService.create({ roleId, roleName });
+
+    request$
+      .pipe(finalize(() => this.isSubmitting.set(false)))
+      .subscribe({
+        next: () => {
+          this.toast.show(this.editId() ? 'Role updated.' : 'Role created.', 'success');
+          this.closeModal();
+          this.loadRoles();
+        },
+        error: (error) => {
+          const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to save role.';
+          this.toast.show(message, 'error');
+        }
+      });
   }
 
   onDelete(id: string): void {
-    this.roles.update(list => list.filter(r => r.id !== id));
-    this.toast.show('Role deleted.', 'success');
+    this.rolesService.delete(id).subscribe({
+      next: () => {
+        this.roles.update(list => list.filter(r => r.id !== id));
+        this.toast.show('Role deleted.', 'success');
+      },
+      error: (error) => {
+        const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to delete role.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  private loadRoles(): void {
+    this.isLoading.set(true);
+    this.rolesService.getAll()
+      .pipe(finalize(() => this.isLoading.set(false)))
+      .subscribe({
+        next: (roles) => {
+          this.roles.set((roles ?? []).map((r: ApiRoleDto) => ({ id: r.roleId, name: r.roleName })));
+        },
+        error: (error) => {
+          this.roles.set([]);
+          const message = error?.error?.error || error?.error?.title || error?.error?.message || 'Failed to load roles.';
+          this.toast.show(message, 'error');
+        }
+      });
   }
 }

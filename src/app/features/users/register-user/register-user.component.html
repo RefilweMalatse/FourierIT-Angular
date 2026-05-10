@@ -20,17 +20,65 @@
         }
       </div>
       <div class="field">
-        <label>Role <span class="req">*</span></label>
-        <select formControlName="roleId">
-          <option value="">Select role</option>
-          @for (r of roles; track r.id) {
-            <option [value]="r.id">{{ r.name }}</option>
-          }
-        </select>
-        @if (form.get('roleId')?.invalid && form.get('roleId')?.touched) {
-          <span class="field__error">Role is required.</span>
+        <label>Username <span class="req">*</span></label>
+        <input type="text" formControlName="username" placeholder="e.g. jsmith">
+        @if (form.get('username')?.invalid && form.get('username')?.touched) {
+          <span class="field__error">Username is required.</span>
         }
       </div>
+    </div>
+
+    <div class="form-row form-row--full">
+      <fieldset class="field field--roles">
+        <legend class="role-fieldset__legend">
+          <span class="role-fieldset__title">Roles <span class="req">*</span></span>
+          @if (!isLoadingRoles()) {
+            <span class="role-picker__counter" [class.role-picker__counter--ok]="selectedRoleCount() > 0">
+              {{ selectedRoleCount() }} / 2 selected
+            </span>
+          }
+        </legend>
+        <p class="field__hint">
+          Pick one or two roles for this account. Stakeholder is exclusive: it cannot be combined with another role—choose Stakeholder alone,
+          or remove it before selecting others.
+        </p>
+
+        @if (isLoadingRoles()) {
+          <div class="role-picker role-picker--loading" aria-busy="true">
+            @for (s of [1, 2, 3]; track s) {
+              <div class="role-picker__skeleton"></div>
+            }
+          </div>
+          <span class="role-picker__loading-text">Loading roles…</span>
+        } @else {
+          <div class="role-picker" role="presentation">
+            @for (r of roles; track r.id) {
+              <label
+                class="role-option"
+                [class.role-option--selected]="isRoleSelected(r.id)"
+              >
+                <input
+                  class="role-option__input"
+                  type="checkbox"
+                  [id]="'role-cb-' + r.id"
+                  [checked]="isRoleSelected(r.id)"
+                  (change)="toggleRoleSelection(r.id, $any($event.target).checked)"
+                />
+                <span class="role-option__box" aria-hidden="true">
+                  <svg class="role-option__tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span class="role-option__label">{{ r.name }}</span>
+              </label>
+            }
+          </div>
+        }
+
+        @if (form.get('roleIds')?.invalid && form.get('roleIds')?.touched) {
+          <span class="field__error">Select at least one role (up to two).</span>
+        }
+      </fieldset>
     </div>
 
     <div class="form-row">
@@ -67,95 +115,45 @@
       </div>
     </div>
 
+    <div class="form-row">
+      <div class="field">
+        <label>Date of Birth <span class="req">*</span></label>
+        <input type="date" formControlName="dateOfBirth" [max]="maxBirthDate" [min]="minBirthDate">
+        @if (form.get('dateOfBirth')?.invalid && form.get('dateOfBirth')?.touched) {
+          @if (form.get('dateOfBirth')?.errors?.['required']) {
+            <span class="field__error">Date of birth is required.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateFuture']) {
+            <span class="field__error">Date of birth cannot be in the future.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateTooOld']) {
+            <span class="field__error">Please enter a realistic date of birth.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateInvalid']) {
+            <span class="field__error">Enter a valid calendar date.</span>
+          }
+        }
+      </div>
+      <div class="field">
+        <label>Job Title <span class="req">*</span></label>
+        <input type="text" formControlName="jobTitle" placeholder="e.g. Compliance Officer">
+        @if (form.get('jobTitle')?.invalid && form.get('jobTitle')?.touched) {
+          <span class="field__error">Job title is required.</span>
+        }
+      </div>
+    </div>
+
     <div class="form-row--full form-row">
       <div class="field">
         <label>Phone Number</label>
-        <input type="tel" formControlName="phone" placeholder="+27 82 000 0000">
-      </div>
-    </div>
-
-    <!-- SECTION: Address (ERD: Address, Province, City, Suburb) -->
-    <h2 class="form-section-title">Address</h2>
-
-    <div class="form-row--full form-row">
-      <div class="field">
-        <label>Address Line</label>
-        <input type="text" formControlName="addressLine" placeholder="Street address">
-      </div>
-    </div>
-
-    <div class="form-row--three form-row">
-      <div class="field">
-        <label>Province</label>
-        <select formControlName="province">
-          <option value="">Select province</option>
-          @for (p of provinces; track p) {
-            <option [value]="p">{{ p }}</option>
+        <input type="tel" formControlName="phone" placeholder="082 123 4567" inputmode="numeric" autocomplete="tel">
+        <p class="field__hint">Optional. South African mobile: up to 10 digits (e.g. 082&nbsp;123&nbsp;4567).</p>
+        @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+          @if (form.get('phone')?.errors?.['phoneTooManyDigits']) {
+            <span class="field__error">Phone number must be at most 10 digits.</span>
+          } @else if (form.get('phone')?.errors?.['phoneTooShort']) {
+            <span class="field__error">Enter a complete South African mobile number (9–10 digits).</span>
+          } @else if (form.get('phone')?.errors?.['phoneInvalid']) {
+            <span class="field__error">Enter a valid South African mobile number (e.g. 082&nbsp;123&nbsp;4567).</span>
           }
-        </select>
-      </div>
-      <div class="field">
-        <label>City</label>
-        <input type="text" formControlName="city" placeholder="e.g. Pretoria">
-      </div>
-      <div class="field">
-        <label>Postal Code</label>
-        <input type="text" formControlName="postalCode" placeholder="e.g. 0001">
-      </div>
-    </div>
-
-    <div class="form-row--full form-row">
-      <div class="field">
-        <label>Suburb</label>
-        <input type="text" formControlName="suburb" placeholder="e.g. Hatfield">
-      </div>
-    </div>
-
-    <!-- SECTION: Security Question (ERD: SecurityQuestion, UserSecurityQuestion) -->
-    <h2 class="form-section-title">Security Question</h2>
-
-    <div class="form-row">
-      <div class="field">
-        <label>Security Question <span class="req">*</span></label>
-        <select formControlName="securityQuestion">
-          <option value="">Select a question</option>
-          @for (q of securityQuestions; track q) {
-            <option [value]="q">{{ q }}</option>
-          }
-        </select>
-        @if (form.get('securityQuestion')?.invalid && form.get('securityQuestion')?.touched) {
-          <span class="field__error">Security question is required.</span>
         }
-      </div>
-      <div class="field">
-        <label>Answer <span class="req">*</span></label>
-        <input type="text" formControlName="securityAnswer" placeholder="Your answer">
-        @if (form.get('securityAnswer')?.invalid && form.get('securityAnswer')?.touched) {
-          <span class="field__error">Answer is required.</span>
-        }
-      </div>
-    </div>
-
-    <!-- SECTION: Settings -->
-    <h2 class="form-section-title">Settings</h2>
-
-    <div class="form-row">
-      <div class="field">
-        <label>Account Status</label>
-        <select formControlName="accountStatus">
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-          <option value="Suspended">Suspended</option>
-        </select>
-      </div>
-      <div class="field field--checkbox">
-        <label>Enable MFA</label>
-        <label class="toggle">
-          <input type="checkbox" formControlName="mfaEnabled">
-          <span class="toggle__track"></span>
-          <span class="toggle__label">Multi-factor authentication</span>
-        </label>
-        <span class="field__hint">From ERD: mfa_enabled on User table</span>
       </div>
     </div>
 
