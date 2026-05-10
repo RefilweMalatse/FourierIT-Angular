@@ -1,8 +1,14 @@
 import { Component, ElementRef, HostListener, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
-import { AuthService, CurrentAccount } from '../../core/services/auth.service';
+import {
+  AuthService,
+  CurrentAccount,
+  UpdateCurrentAccountPayload
+} from '../../core/services/auth.service';
+import { birthDateReasonable, formatIsoDateLocal, saMobilePhoneOptional } from '../../core/validators/profile.validators';
 
 export interface NavItem {
   label: string;
@@ -14,18 +20,37 @@ export interface NavItem {
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterLink, RouterLinkActive, ReactiveFormsModule],
   templateUrl: './sidebar.component.html',
   styleUrl: './sidebar.component.scss'
 })
 export class SidebarComponent {
   auth = inject(AuthService);
   private host = inject(ElementRef<HTMLElement>);
+  private fb = inject(FormBuilder);
   openGroup = signal<string | null>(null);
   profileOpen = signal(false);
   accountDetails = signal<CurrentAccount | null>(null);
   loadingAccount = signal(false);
   accountError = signal<string | null>(null);
+  editingProfile = signal(false);
+  savingProfile = signal(false);
+  profileSaveError = signal<string | null>(null);
+  readonly maxBirthDate = formatIsoDateLocal(new Date());
+  readonly minBirthDate = formatIsoDateLocal((() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 120);
+    return d;
+  })());
+
+  editForm = this.fb.group({
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    emailAddress: ['', [Validators.required, Validators.email]],
+    phoneNumber: ['', saMobilePhoneOptional()],
+    jobTitle: [''],
+    dateOfBirth: ['', birthDateReasonable()]
+  });
 
   //these are the icons used in the sidebar, they are stored as svg strings and rendered using innerHTML in the template
   getIcon(name: string): string {
@@ -89,6 +114,7 @@ export class SidebarComponent {
 
   logout(): void {
     this.profileOpen.set(false);
+    this.editingProfile.set(false);
     this.accountDetails.set(null);
     this.auth.logout();
   }
@@ -106,6 +132,7 @@ export class SidebarComponent {
     event.stopPropagation();
     if (this.profileOpen()) {
       this.profileOpen.set(false);
+      this.editingProfile.set(false);
       return;
     }
     this.profileOpen.set(true);
@@ -130,6 +157,73 @@ export class SidebarComponent {
             ?? (err?.message as string | undefined)
             ?? 'Could not load your profile.';
           this.accountError.set(typeof msg === 'string' ? msg : 'Could not load your profile.');
+        }
+      });
+  }
+
+  startEditProfile(): void {
+    const account = this.accountDetails();
+    if (!account) return;
+    this.profileSaveError.set(null);
+    this.editForm.reset({
+      firstName: account.firstName ?? '',
+      lastName: account.lastName ?? '',
+      emailAddress: account.email ?? '',
+      phoneNumber: this.displayPhone(account),
+      jobTitle: account.jobTitle ?? '',
+      dateOfBirth: this.toDateInputValue(account.dateOfBirth)
+    });
+    this.editingProfile.set(true);
+  }
+
+  cancelEditProfile(): void {
+    this.editingProfile.set(false);
+    this.profileSaveError.set(null);
+  }
+
+  saveProfile(): void {
+    const account = this.accountDetails();
+    if (!account?.profileId) {
+      this.profileSaveError.set('Could not update profile right now.');
+      return;
+    }
+
+    if (this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+
+    const formValue = this.editForm.getRawValue();
+    const payload: UpdateCurrentAccountPayload = {
+      firstName: (formValue.firstName ?? '').trim(),
+      lastName: (formValue.lastName ?? '').trim(),
+      dateOfBirth: formValue.dateOfBirth || '',
+      phoneNumber: (formValue.phoneNumber ?? '').trim(),
+      jobTitle: (formValue.jobTitle ?? '').trim(),
+      emailAddress: (formValue.emailAddress ?? '').trim(),
+      role: account.roles[0] ?? '',
+      accountStatus: account.accountStatus ?? 'Active'
+    };
+
+    this.savingProfile.set(true);
+    this.profileSaveError.set(null);
+    this.auth.updateCurrentAccount(account.profileId, payload)
+      .pipe(finalize(() => this.savingProfile.set(false)))
+      .subscribe({
+        next: () => {
+          this.editingProfile.set(false);
+          this.loadAccount();
+        },
+        error: (err) => {
+          const body = err?.error;
+          const msg =
+            (typeof body === 'string' ? body : null)
+            ?? body?.error
+            ?? body?.title
+            ?? body?.message
+            ?? (err?.message as string | undefined)
+            ?? 'Could not update your profile.';
+          this.profileSaveError.set(typeof msg === 'string' ? msg : 'Could not update your profile.');
         }
       });
   }
@@ -159,5 +253,10 @@ export class SidebarComponent {
 
   profileFullName(a: CurrentAccount): string {
     return `${a.firstName ?? ''} ${a.lastName ?? ''}`.trim();
+  }
+
+  private toDateInputValue(value: string | null): string {
+    if (!value) return '';
+    return String(value).slice(0, 10);
   }
 }

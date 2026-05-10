@@ -230,6 +230,77 @@
     }
   }
 
+  &__profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__profile-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  &__profile-input {
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    font-size: 12px;
+    padding: 7px 8px;
+    line-height: 1.2;
+
+    &::placeholder {
+      color: rgba(255,255,255,0.4);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--blue-light);
+      outline-offset: 1px;
+    }
+  }
+
+  &__profile-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  &__profile-action {
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 11.5px;
+    line-height: 1.2;
+    cursor: pointer;
+    margin-top: 0;
+
+    &:hover:not(:disabled) {
+      background: rgba(255,255,255,0.18);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &--secondary {
+      background: transparent;
+      color: rgba(255,255,255,0.78);
+      margin-top: 0;
+    }
+  }
+
+  &__profile-dl + &__profile-action {
+    margin-top: 10px;
+  }
+
   &__mono {
     font-family: ui-monospace, monospace;
     font-size: 10.5px;
