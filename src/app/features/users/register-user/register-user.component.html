@@ -1,0 +1,168 @@
+<div class="page">
+  <div class="page-header">
+    <div class="page-header__titles">
+      <h1>Register New User</h1>
+      <p>Create a new user account with access permissions</p>
+    </div>
+  </div>
+
+  <form class="form-card" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+
+    <!-- SECTION: Account Credentials -->
+    <h2 class="form-section-title">Account Credentials</h2>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Email Address <span class="req">*</span></label>
+        <input type="email" formControlName="email" placeholder="user@fourier.com">
+        @if (form.get('email')?.invalid && form.get('email')?.touched) {
+          <span class="field__error">Valid email is required.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Username <span class="req">*</span></label>
+        <input type="text" formControlName="username" placeholder="e.g. jsmith">
+        @if (form.get('username')?.invalid && form.get('username')?.touched) {
+          <span class="field__error">Username is required.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row form-row--full">
+      <fieldset class="field field--roles">
+        <legend class="role-fieldset__legend">
+          <span class="role-fieldset__title">Roles <span class="req">*</span></span>
+          @if (!isLoadingRoles()) {
+            <span class="role-picker__counter" [class.role-picker__counter--ok]="selectedRoleCount() > 0">
+              {{ selectedRoleCount() }} / 2 selected
+            </span>
+          }
+        </legend>
+        <p class="field__hint">
+          Pick one or two roles for this account. Stakeholder is exclusive: it cannot be combined with another role—choose Stakeholder alone,
+          or remove it before selecting others.
+        </p>
+
+        @if (isLoadingRoles()) {
+          <div class="role-picker role-picker--loading" aria-busy="true">
+            @for (s of [1, 2, 3]; track s) {
+              <div class="role-picker__skeleton"></div>
+            }
+          </div>
+          <span class="role-picker__loading-text">Loading roles…</span>
+        } @else {
+          <div class="role-picker" role="presentation">
+            @for (r of roles; track r.id) {
+              <label
+                class="role-option"
+                [class.role-option--selected]="isRoleSelected(r.id)"
+              >
+                <input
+                  class="role-option__input"
+                  type="checkbox"
+                  [id]="'role-cb-' + r.id"
+                  [checked]="isRoleSelected(r.id)"
+                  (change)="toggleRoleSelection(r.id, $any($event.target).checked)"
+                />
+                <span class="role-option__box" aria-hidden="true">
+                  <svg class="role-option__tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <span class="role-option__label">{{ r.name }}</span>
+              </label>
+            }
+          </div>
+        }
+
+        @if (form.get('roleIds')?.invalid && form.get('roleIds')?.touched) {
+          <span class="field__error">Select at least one role (up to two).</span>
+        }
+      </fieldset>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Password <span class="req">*</span></label>
+        <input type="password" formControlName="password" placeholder="Min. 8 characters">
+        @if (form.get('password')?.invalid && form.get('password')?.touched) {
+          <span class="field__error">Password must be at least 8 characters.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Confirm Password <span class="req">*</span></label>
+        <input type="password" formControlName="confirmPassword" placeholder="Repeat password">
+      </div>
+    </div>
+
+    <!-- SECTION: Personal Info -->
+    <h2 class="form-section-title">Personal Information</h2>
+
+    <div class="form-row">
+      <div class="field">
+        <label>First Name <span class="req">*</span></label>
+        <input type="text" formControlName="firstName" placeholder="e.g. John">
+        @if (form.get('firstName')?.invalid && form.get('firstName')?.touched) {
+          <span class="field__error">First name is required.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Last Name <span class="req">*</span></label>
+        <input type="text" formControlName="lastName" placeholder="e.g. Smith">
+        @if (form.get('lastName')?.invalid && form.get('lastName')?.touched) {
+          <span class="field__error">Last name is required.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>Date of Birth <span class="req">*</span></label>
+        <input type="date" formControlName="dateOfBirth" [max]="maxBirthDate" [min]="minBirthDate">
+        @if (form.get('dateOfBirth')?.invalid && form.get('dateOfBirth')?.touched) {
+          @if (form.get('dateOfBirth')?.errors?.['required']) {
+            <span class="field__error">Date of birth is required.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateFuture']) {
+            <span class="field__error">Date of birth cannot be in the future.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateTooOld']) {
+            <span class="field__error">Please enter a realistic date of birth.</span>
+          } @else if (form.get('dateOfBirth')?.errors?.['birthDateInvalid']) {
+            <span class="field__error">Enter a valid calendar date.</span>
+          }
+        }
+      </div>
+      <div class="field">
+        <label>Job Title <span class="req">*</span></label>
+        <input type="text" formControlName="jobTitle" placeholder="e.g. Compliance Officer">
+        @if (form.get('jobTitle')?.invalid && form.get('jobTitle')?.touched) {
+          <span class="field__error">Job title is required.</span>
+        }
+      </div>
+    </div>
+
+    <div class="form-row--full form-row">
+      <div class="field">
+        <label>Phone Number</label>
+        <input type="tel" formControlName="phone" placeholder="082 123 4567" inputmode="numeric" autocomplete="tel">
+        <p class="field__hint">Optional. South African mobile: up to 10 digits (e.g. 082&nbsp;123&nbsp;4567).</p>
+        @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+          @if (form.get('phone')?.errors?.['phoneTooManyDigits']) {
+            <span class="field__error">Phone number must be at most 10 digits.</span>
+          } @else if (form.get('phone')?.errors?.['phoneTooShort']) {
+            <span class="field__error">Enter a complete South African mobile number (9–10 digits).</span>
+          } @else if (form.get('phone')?.errors?.['phoneInvalid']) {
+            <span class="field__error">Enter a valid South African mobile number (e.g. 082&nbsp;123&nbsp;4567).</span>
+          }
+        }
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary" [disabled]="isSubmitting()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z"/></svg>
+        {{ isSubmitting() ? 'Registering...' : 'Register User' }}
+      </button>
+      <button type="button" class="btn btn--outline" (click)="cancel()">Cancel</button>
+    </div>
+  </form>
+</div>

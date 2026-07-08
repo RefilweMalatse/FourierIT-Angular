@@ -1,0 +1,192 @@
+import { Component, inject, signal, ChangeDetectionStrategy, ChangeDetectorRef, OnInit } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { CommonModule } from '@angular/common';
+import { finalize } from 'rxjs';
+import { ToastService } from '../../../core/services/toast.service';
+import { AuthService } from '../../../core/services/auth.service';
+import {
+  InstitutionDto,
+  InstitutionService,
+  InstitutionTypeOption
+} from '../../../core/services/institution.service';
+import { AuditEventType } from '../../../core/models/institution.models';
+
+@Component({
+  selector: 'app-institutions',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [CommonModule, ReactiveFormsModule],
+  templateUrl: './institutions.component.html',
+  styleUrl: './institutions.component.scss'
+})
+export class InstitutionsComponent implements OnInit {
+  readonly auth = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
+  private fb = inject(FormBuilder);
+  private toast = inject(ToastService);
+  private institutionService = inject(InstitutionService);
+
+  showModal = signal(false);
+  editId = signal<number | null>(null);
+  isSubmitting = signal(false);
+  isLoadingList = signal(false);
+  isLoadingTypes = signal(false);
+  search = signal('');
+
+  institutionTypes = signal<InstitutionTypeOption[]>([]);
+  institutions = signal<InstitutionDto[]>([]);
+
+  form = this.fb.group({
+    institutionName: ['', [Validators.required, Validators.maxLength(150)]],
+    verifiedDomain: ['', [Validators.required, Validators.maxLength(255)]],
+    regNumber: [null as number | null, [Validators.required, Validators.min(1)]],
+    typeId: [null as number | null, Validators.required]
+  });
+
+  ngOnInit(): void {
+    this.loadTypes();
+    this.loadInstitutions();
+  }
+
+  get filtered(): InstitutionDto[] {
+    const q = this.search().toLowerCase().trim();
+    if (!q) return this.institutions();
+    return this.institutions().filter(
+      i =>
+        i.institutionName.toLowerCase().includes(q) ||
+        i.verifiedDomain.toLowerCase().includes(q) ||
+        String(i.regNumber).includes(q) ||
+        (i.institutionTypeName ?? '').toLowerCase().includes(q)
+    );
+  }
+
+  openCreate(): void {
+    this.loadTypes();
+    this.editId.set(null);
+    this.form.reset({
+      institutionName: '',
+      verifiedDomain: '',
+      regNumber: null,
+      typeId: null
+    });
+    this.showModal.set(true);
+  }
+
+  openEdit(inst: InstitutionDto): void {
+    this.loadTypes();
+    this.editId.set(inst.institutionId);
+    this.form.patchValue({
+      institutionName: inst.institutionName,
+      verifiedDomain: inst.verifiedDomain,
+      regNumber: inst.regNumber,
+      typeId: inst.typeId
+    });
+    this.showModal.set(true);
+  }
+
+  closeModal(): void {
+    this.showModal.set(false);
+  }
+
+  onSubmit(): void {
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const v = this.form.getRawValue();
+    const typeId = v.typeId;
+    const regNumber = v.regNumber;
+    if (typeId == null || regNumber == null) return;
+
+    const payload = {
+      institutionName: (v.institutionName ?? '').trim(),
+      verifiedDomain: (v.verifiedDomain ?? '').trim(),
+      regNumber,
+      typeId
+    };
+
+    const id = this.editId();
+    this.isSubmitting.set(true);
+
+    this.auth.logActivity(AuditEventType.CREATE, `Submitting institution ${payload.institutionName}`);
+
+    const req$ =
+      id != null
+        ? this.institutionService.update(id, payload)
+        : this.institutionService.create(payload);
+
+    req$.pipe(finalize(() => this.isSubmitting.set(false))).subscribe({
+      next: () => {
+        this.auth.logActivity(id != null ? AuditEventType.UPDATE : AuditEventType.CREATE, `Institution ${payload.institutionName} saved`);
+        this.toast.show(id != null ? 'Institution updated.' : 'Institution registered.', 'success');
+        this.showModal.set(false);
+        this.loadInstitutions();
+      },
+      error: err => {
+        const body = err?.error;
+        const message =
+          body?.error ??
+          body?.title ??
+          body?.detail ??
+          (typeof body === 'string' ? body : null) ??
+          'Request failed.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  onDelete(inst: InstitutionDto): void {
+    if (!confirm(`Delete institution "${inst.institutionName}"? This cannot be undone.`)) return;
+
+    this.institutionService.delete(inst.institutionId).subscribe({
+      next: () => {
+        this.auth.logActivity(AuditEventType.DELETE, `Deleted institution ${inst.institutionName}`);
+        this.institutions.update(list => list.filter(i => i.institutionId !== inst.institutionId));
+        this.toast.show('Institution deleted.', 'success');
+      },
+      error: err => {
+        const message =
+          err?.error?.error ?? err?.error?.title ?? err?.error?.message ?? 'Failed to delete institution.';
+        this.toast.show(message, 'error');
+      }
+    });
+  }
+
+  private loadInstitutions(): void {
+    this.isLoadingList.set(true);
+    this.institutionService
+      .getAll()
+      .pipe(finalize(() => this.isLoadingList.set(false)))
+      .subscribe({
+        next: rows => {
+          this.institutions.set(rows ?? []);
+          this.cdr.markForCheck();
+        },
+        error: err => {
+          this.institutions.set([]);
+          const message =
+            err?.error?.title ?? err?.error?.message ?? 'Could not load institutions.';
+          this.toast.show(message, 'error');
+        }
+      });
+  }
+
+  private loadTypes(): void {
+    this.isLoadingTypes.set(true);
+    this.institutionService
+      .getTypes()
+      .pipe(finalize(() => this.isLoadingTypes.set(false)))
+      .subscribe({
+        next: types => {
+          this.institutionTypes.set(types ?? []);
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.institutionTypes.set([]);
+          this.toast.show('Could not load institution types.', 'error');
+        }
+      });
+  }
+}

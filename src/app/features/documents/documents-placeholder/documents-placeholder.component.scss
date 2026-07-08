@@ -1,0 +1,17 @@
+.documents-placeholder {
+  padding: clamp(2rem, 5vw, 3rem);
+  max-width: 36rem;
+
+  h1 {
+    margin: 0 0 0.75rem;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text, #111);
+  }
+
+  p {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-mid, #666);
+  }
+}

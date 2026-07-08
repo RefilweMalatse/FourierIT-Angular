@@ -1,0 +1,12 @@
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-shell__content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--bg);
+  padding: 32px 36px;
+}

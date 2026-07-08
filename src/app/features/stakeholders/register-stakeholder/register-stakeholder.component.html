@@ -1,0 +1,119 @@
+<div class="page">
+  <div class="page-header">
+    <div class="page-header__titles">
+      <h1>Register New Stakeholder</h1>
+      <p>Register an internal or external stakeholder</p>
+    </div>
+  </div>
+
+  <form class="form-card" [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+
+    <h2 class="form-section-title">Personal Details</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Name <span class="req">*</span></label>
+        <input type="text" formControlName="name" placeholder="First name">
+        @if (form.get('name')?.invalid && form.get('name')?.touched) {
+          <span class="field__error">Name is required.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Surname <span class="req">*</span></label>
+        <input type="text" formControlName="surname" placeholder="Last name">
+        @if (form.get('surname')?.invalid && form.get('surname')?.touched) {
+          <span class="field__error">Surname is required.</span>
+        }
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Email Address <span class="req">*</span></label>
+        <input type="email" formControlName="email" placeholder="stakeholder@org.com">
+        @if (form.get('email')?.invalid && form.get('email')?.touched) {
+          <span class="field__error">Valid email is required.</span>
+        }
+      </div>
+      <div class="field">
+        <label>Phone Number <span class="req">*</span></label>
+        <input type="tel" formControlName="phone" placeholder="+27 82 000 0000">
+      </div>
+    </div>
+
+    <h2 class="form-section-title">Organisation & Role</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Organisation Name <span class="req">*</span></label>
+        <input type="text" formControlName="organizationName" placeholder="e.g. External Audit Co">
+      </div>
+      <div class="field">
+        <label>Institution <span class="req">*</span></label>
+        <select formControlName="institutionId">
+          <option value="">Select institution</option>
+          @for (i of institutions; track i.id) {
+            <option [value]="i.id">{{ i.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Stakeholder Type <span class="req">*</span></label>
+        <select formControlName="stakeholderType">
+          <option value="">Select type</option>
+          @for (t of stakeholderTypes; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label>Access Level <span class="req">*</span></label>
+        <select formControlName="roleId">
+          <option value="">Select access level</option>
+          @for (r of roles; track r.id) {
+            <option [value]="r.id">{{ r.name }}</option>
+          }
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Enlistment Status</label>
+        <select formControlName="enlistmentStatus">
+          <option value="Active">Active</option>
+          <option value="Pending">Pending</option>
+          <option value="Suspended">Suspended</option>
+        </select>
+        <span class="field__hint">Maps to ClientEnlistment.Status in ERD</span>
+      </div>
+      <div class="field field--checkbox">
+        <label>PEP Status</label>
+        <label class="toggle">
+          <input type="checkbox" formControlName="isPEP">
+          <span class="toggle__track"></span>
+          <span class="toggle__label">Is Politically Exposed Person</span>
+        </label>
+        <span class="field__hint">Maps to IsPEPstatus in User table</span>
+      </div>
+    </div>
+
+    <h2 class="form-section-title">Account Credentials</h2>
+    <div class="form-row">
+      <div class="field">
+        <label>Password <span class="req">*</span></label>
+        <input type="password" formControlName="password" placeholder="Min. 8 characters">
+      </div>
+      <div class="field">
+        <label>Confirm Password <span class="req">*</span></label>
+        <input type="password" formControlName="confirmPassword">
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary" [disabled]="isSubmitting()">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z"/></svg>
+        {{ isSubmitting() ? 'Registering...' : 'Register Stakeholder' }}
+      </button>
+      <button type="button" class="btn btn--outline" (click)="cancel()">Cancel</button>
+    </div>
+  </form>
+</div>
